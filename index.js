@@ -1,11 +1,14 @@
 // This is a port foor node.js of this great article's code:
 // http://cgbystrom.com/articles/deconstructing-spotifys-builtin-http-server/
+// modified by Loreto Parisi (loretoparisi at gmail dot com) 2016-06-01
+// @see https://github.com/loretoparisi/node-spotify-webhelper
 
 var request = require('request')
 var qs = require('querystring')
 var util = require('util');
 var path = require('path');
 var child_process = require('child_process');
+var portscanner  = require('./portscanner');
 
 // global variables, used when running on windows
 var wintools;
@@ -16,6 +19,45 @@ var DEFAULT_PORT = 4370;
 var DEFAULT_RETURN_ON = ['login', 'logout', 'play', 'pause', 'error', 'ap']
 var DEFAULT_RETURN_AFTER = 1
 var ORIGIN_HEADER = { 'Origin': 'https://open.spotify.com' }
+
+/**
+ * Promise.All
+ * @param items Array of objects
+ * @param block Function block(item,index,resolve,reject)
+ * @param done Function Success block
+ * @param fail Function Failure block
+ * @example
+
+    promiseAll(["a","b","c"],
+    function(item,index,resolve,reject) {
+      MyApp.call(item,function(result) {
+        resolve(result);
+      },
+      function( error ) { reject(error); }):
+    },
+    function(result) { // aggregated results
+
+    },function(error) { // error
+
+    })
+
+  * @author Loreto Parisi (loretoparisi at gmail dot com)
+ */
+function promiseAll(items, block, done, fail) {
+  var promises = [], index=0;
+  items.forEach(function(item) {
+    promises.push( function(item,i) {
+        return new Promise(function(resolve, reject) {
+          if(block) block.apply(this,[item,index,resolve,reject]);
+        });
+      }(item,++index))
+  });
+  Promise.all(promises).then(function AcceptHandler(results) {
+    if(done) done( results );
+  }, function ErrorHandler(error) {
+    if(fail) fail( error );
+  });
+} //promiseAll
 
 function getJson(url, params, headers, cb) {
     if (params instanceof Function) {
@@ -33,7 +75,7 @@ function getJson(url, params, headers, cb) {
     cb = cb || function () { };
     if (params)
         url += '?' + qs.stringify(params)
-    
+
     // rejectUnauthorized:false should be ok here since we are working with localhost
     // this fixes the UNABLE_TO_VERIFY_LEAF_SIGNATURE error
     request({ 'url': url, 'headers': headers, 'rejectUnauthorized' : false}, function (err, req, body) {
@@ -57,7 +99,7 @@ var ASCII_LOWER_CASE = "abcdefghijklmnopqrstuvwxyz";
 // http://stackoverflow.com/questions/1349404/generate-a-string-of-5-random-characters-in-javascript
 function generateRandomString(length) {
     var text = "";
-    
+
     for( var i=0; i < 10; i++ )
         text += ASCII_LOWER_CASE.charAt(Math.floor(Math.random() * ASCII_LOWER_CASE.length));
 
@@ -148,14 +190,15 @@ function SpotifyWebHelper(opts) {
     }
 
     opts = opts || {};
-    var localPort = opts.port || DEFAULT_PORT;
+    this.localPort = opts.port || DEFAULT_PORT;
 
     function generateSpotifyUrl(url) {
-        return util.format("https://%s:%d%s", generateRandomLocalHostName(), localPort, url)
+        return util.format("https://%s:%d%s", generateRandomLocalHostName(), this.localPort, url)
     }
 
-
-    function getVersion(cb) {
+    function getVersion(cb,port) {
+        port=port||this.localPort;
+        this.localPort=port;
         var url = generateSpotifyUrl('/service/version.json');
         return getJson(url, { 'service': 'remote' }, ORIGIN_HEADER, cb)
     }
@@ -180,7 +223,7 @@ function SpotifyWebHelper(opts) {
         if (self.isInitialized) {
             return cb();
         }
-        
+
         launchSpotifyWebhelperIfNeeded(function (err, res) {
           if (err) {
             return cb(err);
@@ -289,6 +332,76 @@ function SpotifyWebHelper(opts) {
 
       spotifyJsonRequest(this, '/remote/play.json', params, cb);
     }
+
+    this.getLocalHostname = function() {
+      return generateRandomLocalHostName();
+    }
+
+    /**
+     * Scan available ports
+     * @param options Object
+
+      {
+        lowPort := integer lower port number defaults 3000
+        highPort := integer higer port number defaults 5000
+        open := bool true to filter open ports only
+        timeout := int milliseconds for socket timeout
+      }
+
+     * @param cb function Callback (error,results)
+     * @author Loreto Parisi (loretoparisi at gmail dot com)
+     */
+    this.scanPorts = function(options, cb) {
+      var self=this;
+
+      var open = options.open || true;
+      var lowPort = options.lowPort || 3000;
+      var highPort = options.highPort || 5000;
+      var timeout = options.timeout || 300;
+      var options = {
+          host : generateRandomLocalHostName(),
+          timeout : timeout || 300, // socket timeout in msec
+          all : true
+      };
+      portscanner.findAPortInUse(lowPort, highPort, options, function(error, ports) {
+        if(!error) {
+
+          // test ports and wait for a response
+          promiseAll( ports
+            , function(item,index,resolve,reject) { // item block
+              getVersion(function (err, res) {
+                if (err) {
+                  return resolve( { error : err , port : item } );
+                }
+                try {
+                  var jsonResponse=JSON.parse( JSON.stringify(res) );
+                  if( jsonResponse.client_version && jsonResponse.version ) { // spotify local protocol
+                    return resolve( { port : item } );
+                  }
+                  else { // bad protocol
+                      return resolve( { error : new Error('bad protocol response'), port : item } );
+                  }
+                } catch(ex) { // bad protocol
+                  return resolve( { error : new Error('bad protocol response') , port : item } );
+                }
+              }, item);
+            }
+          , function(ports) { // all done
+            // filtering out ports with errors not supporting spotify local protocol
+            var openPorts = open?ports:ports.filter(function(p,index) {
+                return !p.error
+            });
+            return cb(null,openPorts);
+          }
+          , function(error) { // error
+            return cb(error);
+          });
+        }
+        else {
+            cb(error);
+        }
+      })
+    }//scanPorts
 }
 
 module.exports.SpotifyWebHelper = SpotifyWebHelper;

@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "wintools" : ">=0.1.0",
-    "request" : ">=2.36.0"
+    "request" : ">=2.36.0",
+    "async": "0.1.15"
   },
   "devDependencies": {},
   "keywords": [
