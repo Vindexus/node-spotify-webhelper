@@ -200,167 +200,32 @@ function SpotifyWebHelper(opts) {
 
     opts = opts || {};
     var localPort = opts.port || DEFAULT_PORT;
-
-    console.log("init with ", opts);
+    var autoDectect = opts.autoDectect || false;
 
     function generateSpotifyUrl(url,port) {
       port = port || localPort;
       var url=util.format("https://%s:%d%s", generateRandomLocalHostName(), port, url)
-      console.log("generateSpotifyUrl",url)
       return url;
     }//generateSpotifyUrl
+
     function getVersion(cb,port) {
       var url = generateSpotifyUrl('/service/version.json',port);
       return getJson(url, { 'service': 'remote' }, ORIGIN_HEADER, cb)
     }//getVersion
-    function getCsrfToken(cb) {
+
+    function getCsrfToken(cb,port) {
       // Requires Origin header to be set to generate the CSRF token.
-      var url = generateSpotifyUrl('/simplecsrf/token.json');
+      var url = generateSpotifyUrl('/simplecsrf/token.json',port);
       return getJson(url, null, ORIGIN_HEADER, function (err, res) {
           if (err) {
               return cb(err);
           }
-
           return cb(null, res['token']);
       });
     }//getCsrfToken
-    this.isInitialized = false;
-    this.init = function (cb) {
-        var self = this;
-        cb = cb || function () { };
-        if (self.isInitialized) {
-            return cb();
-        }
-
-        launchSpotifyWebhelperIfNeeded(function (err, res) {
-          if (err) {
-            return cb(err);
-          }
-
-          if (!res) {
-            return cb(new Error('SpotifyWebHelper not running, failed to start it'));
-          }
-
-          getOauthToken(function (err, oauthToken) {
-              if (err) {
-                  return cb(err);
-              }
-
-              self.oauthToken = oauthToken;
-
-              getCsrfToken(function (err, csrfToken) {
-                  if (err) {
-                      return cb(err);
-                  }
-
-                  self.csrfToken = csrfToken;
-                  self.isInitialized = true;
-                  return cb();
-              });
-          });
-        });
-    }//init
-    function spotifyJsonRequest(self, spotifyRelativeUrl, additionalParams, cb) {
-      cb = cb || function () { };
-      additionalParams = additionalParams || {};
-
-      self.init(function (err) {
-        if (err) {
-          return cb(err);
-        }
-
-        params = {
-          'oauth': self.oauthToken,
-          'csrf': self.csrfToken,
-        }
-
-        for (var key in additionalParams) {
-          params[key] = additionalParams[key];
-        }
-
-        var url = generateSpotifyUrl(spotifyRelativeUrl);
-        getJson(url, params, ORIGIN_HEADER, cb);
-      });
-    }//spotifyJsonRequest
 
     /**
-     * Get Player Status
-     */
-    this.getStatus = function (returnAfter, returnOn, cb) {
-
-        if (returnAfter instanceof Function) {
-            cb = returnAfter;
-            returnAfter = null;
-            returnOn = null;
-        }
-
-        if (returnOn instanceof Function) {
-            cb = returnOn;
-            returnOn = null;
-        }
-
-        returnOn = returnOn || DEFAULT_RETURN_ON;
-        returnAfter = returnAfter || DEFAULT_RETURN_AFTER;
-
-        cb = cb || function() {};
-
-        params = {
-          'returnafter': returnAfter,
-          'returnon': returnOn.join(',')
-        }
-
-        spotifyJsonRequest(this, '/remote/status.json', params, cb);
-    }
-
-    /**
-     * Pause the player
-     */
-    this.pause = function (cb) {
-      cb = cb || function() {};
-
-      params = {
-        'pause' : true
-      }
-
-      spotifyJsonRequest(this, '/remote/pause.json', params, cb);
-    }
-
-    /**
-     * Revert pause state to previous state: play | stopped
-     */
-    this.unpause = function (cb) {
-      cb = cb || function () { };
-
-      params = {
-        'pause': false
-      }
-
-      spotifyJsonRequest(this, '/remote/pause.json', params, cb);
-    }
-
-    /**
-     * Play a track by Spotify Track uri
-     */
-    this.play = function (spotifyUri, cb) {
-      cb = cb || function () { };
-
-      params = {
-        'uri': spotifyUri,
-        'context': spotifyUri
-     }
-
-      spotifyJsonRequest(this, '/remote/play.json', params, cb);
-    }
-
-    /**
-     * Get Spotify local protocol's host name
-     */
-    this.getLocalHostname = function() {
-      return generateRandomLocalHostName();
-    }
-
-    /**
-     * Scan available ports
+     * Scan client open ports
      * @param options Object
 
       {
@@ -373,12 +238,12 @@ function SpotifyWebHelper(opts) {
      * @param cb function Callback (error,results)
      * @author Loreto Parisi (loretoparisi at gmail dot com)
      */
-    this.scanPorts = function(options, cb) {
+    function scanClientOpenPorts(opt,cb) {
       var self=this;
 
-      var lowPort = options.lowPort || 3000;
-      var highPort = options.highPort || 5000;
-      var timeout = options.timeout || 300;
+      var lowPort = opt.lowPort || 3000;
+      var highPort = opt.highPort || 5000;
+      var timeout = opt.timeout || 300;
       var options = {
           host : generateRandomLocalHostName(),
           timeout : timeout || 300, // socket timeout in msec
@@ -386,7 +251,6 @@ function SpotifyWebHelper(opts) {
       };
       portscanner.findAPortInUse(lowPort, highPort, options, function(error, ports) {
         if(!error) {
-
           // test ports and wait for a response
           promiseAll( ports
             , function(item,index,resolve,reject) { // item block
@@ -422,6 +286,197 @@ function SpotifyWebHelper(opts) {
             cb(error);
         }
       })
+    }//scanPorts
+    this.isInitialized = false;
+    this.init = function (cb) {
+        var self = this;
+        cb = cb || function () { };
+        if (self.isInitialized) {
+            return cb();
+        }
+        if(autoDectect) {
+          // auto scan first open port
+          // using a default port interval
+          scanClientOpenPorts({
+            lowPort : 3000,
+            highPort : 5000,
+            timeout : 300
+          }, function(error,ports) {
+            if( !error && ports && ports.length>0) {
+              var localPort=ports[0].port;
+              console.log("spotify listening on port %d", localPort);
+              launchSpotifyWebhelperIfNeeded(function (err, res) {
+                if (err) {
+                  return cb(err);
+                }
+                if (!res) {
+                  return cb(new Error('SpotifyWebHelper not running, failed to start it'));
+                }
+                getOauthToken(function (err, oauthToken) {
+                    if (err) {
+                        return cb(err);
+                    }
+                    self.oauthToken = oauthToken;
+                    getCsrfToken(function (err, csrfToken) {
+                        if (err) {
+                            return cb(err);
+                        }
+
+                        self.csrfToken = csrfToken;
+                        self.isInitialized = true;
+                        return cb();
+                    }, localPort);
+                });
+              });
+            }
+            else return cb(err);
+          })
+        }
+        else { // launch on default port
+          launchSpotifyWebhelperIfNeeded(function (err, res) {
+            if (err) {
+              return cb(err);
+            }
+            if (!res) {
+              return cb(new Error('SpotifyWebHelper not running, failed to start it'));
+            }
+            getOauthToken(function (err, oauthToken) {
+                if (err) {
+                    return cb(err);
+                }
+                self.oauthToken = oauthToken;
+                getCsrfToken(function (err, csrfToken) {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    self.csrfToken = csrfToken;
+                    self.isInitialized = true;
+                    return cb();
+                });
+            });
+          });
+        }
+      }//init
+    function spotifyJsonRequest(self, spotifyRelativeUrl, additionalParams, cb) {
+      cb = cb || function () { };
+      additionalParams = additionalParams || {};
+
+      self.init(function (err) {
+        if (err) {
+          return cb(err);
+        }
+
+        params = {
+          'oauth': self.oauthToken,
+          'csrf': self.csrfToken,
+        }
+
+        for (var key in additionalParams) {
+          params[key] = additionalParams[key];
+        }
+
+        var url = generateSpotifyUrl(spotifyRelativeUrl);
+        getJson(url, params, ORIGIN_HEADER, cb);
+      });
+    }//spotifyJsonRequest
+
+    /******************
+     * Public API
+     ******************/
+
+    /**
+     * Get Player Status
+     */
+    this.getStatus = function (returnAfter, returnOn, cb) {
+
+        if (returnAfter instanceof Function) {
+            cb = returnAfter;
+            returnAfter = null;
+            returnOn = null;
+        }
+
+        if (returnOn instanceof Function) {
+            cb = returnOn;
+            returnOn = null;
+        }
+
+        returnOn = returnOn || DEFAULT_RETURN_ON;
+        returnAfter = returnAfter || DEFAULT_RETURN_AFTER;
+
+        cb = cb || function() {};
+
+        params = {
+          'returnafter': returnAfter,
+          'returnon': returnOn.join(',')
+        }
+
+        spotifyJsonRequest(this, '/remote/status.json', params, cb);
+    }//getStatus
+
+    /**
+     * Pause the player
+     */
+    this.pause = function (cb) {
+      cb = cb || function() {};
+
+      params = {
+        'pause' : true
+      }
+
+      spotifyJsonRequest(this, '/remote/pause.json', params, cb);
+    }//pause
+
+    /**
+     * Revert pause state to previous state: play | stopped
+     */
+    this.unpause = function (cb) {
+      cb = cb || function () { };
+
+      params = {
+        'pause': false
+      }
+
+      spotifyJsonRequest(this, '/remote/pause.json', params, cb);
+    }//unpause
+
+    /**
+     * Play a track by Spotify Track uri
+     */
+    this.play = function (spotifyUri, cb) {
+      cb = cb || function () { };
+
+      params = {
+        'uri': spotifyUri,
+        'context': spotifyUri
+     }
+
+      spotifyJsonRequest(this, '/remote/play.json', params, cb);
+    }//play
+
+    /**
+     * Get Spotify local protocol's host name
+     */
+    this.getLocalHostname = function() {
+      return generateRandomLocalHostName();
+    }//getLocalHostname
+
+    /**
+     * Scan available ports
+     * @param options Object
+
+      {
+        lowPort := integer lower port number defaults 3000
+        highPort := integer higer port number defaults 5000
+        open := bool true to filter open ports only
+        timeout := int milliseconds for socket timeout
+      }
+
+     * @param cb function Callback (error,results)
+     * @author Loreto Parisi (loretoparisi at gmail dot com)
+     */
+    this.scanPorts = function(options, cb) {
+      scanClientOpenPorts(options, cb);
     }//scanPorts
 }//SpotifyWebHelper
 

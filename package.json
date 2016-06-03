@@ -1,6 +1,6 @@
 {
   "name": "node-spotify-webhelper-portscanner",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Node.js interface for the local Spotify WebHelper API plus a Port Scanner",
   "main": "index.js",
   "dependencies": {
@@ -19,6 +19,7 @@
     "type": "git",
     "url": "git@github.com:loretoparisi/node-spotify-webhelper.git"
   },
+  "readmeFilename" : "README.md",
   "homepage": "https://github.com/loretoparisi/node-spotify-webhelper",
   "author": "loretoparisi <loretoparisi@gmail.com",
   "license": "MIT"

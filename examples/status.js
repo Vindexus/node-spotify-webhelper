@@ -15,14 +15,12 @@
   , function(error, ports) {
       if(!error) {
           // connect to port
-          console.log("PORTS ARE", ports);
           ports.map(function(item,index){
 
             var openPort = item.port;
             console.log("Connecting to Spotify on port [%d]...", openPort);
             var spotifyClient = new SpotifyWebHelper( { port : openPort });
             spotifyClient.getStatus(function (err, res) {
-              console.log("RES-ERR",res,err);
               if (err) {
                 console.error(err);
               }

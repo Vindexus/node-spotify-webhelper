@@ -94,4 +94,22 @@ return console.log("Spotify is listening on port [%d]", item);
 });
 ```
 
+Examples - Auto detect an open port and connect
+To automatically detect an open port and connect to this one, use the `autoDectect` option set to true.
+
+```javascript
+var SpotifyWebHelper = require('../index');
+var spotifyClient = new SpotifyWebHelper( { autoDectect : true }); // init with default port
+spotifyClient.getStatus(function (err, res) {
+  if (err) {
+    console.error(err);
+  }
+  else if(res) {
+    console.info('Currently Playing:',
+      res.track.artist_resource.name, '-',
+      res.track.track_resource.name);
+  }
+});
+```
+
 See `examples/` folder for more examples and code.
