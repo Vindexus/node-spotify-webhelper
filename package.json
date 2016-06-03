@@ -1,7 +1,7 @@
 {
-  "name": "node-spotify-webhelper",
-  "version": "0.0.4",
-  "description": "Node.js interface for the local Spotify WebHelper API",
+  "name": "node-spotify-webhelper-portscanner",
+  "version": "1.0.1",
+  "description": "Node.js interface for the local Spotify WebHelper API plus a Port Scanner",
   "main": "index.js",
   "dependencies": {
     "wintools" : ">=0.1.0",
@@ -12,16 +12,14 @@
   "keywords": [
     "spotify",
     "spotifywebhelper",
-    "music"
+    "music",
+    "portscanner"
   ],
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "repository": {
     "type": "git",
-    "url": "git://github.com/nadavbar/node-spotify-webhelper.git"
+    "url": "git@github.com:loretoparisi/node-spotify-webhelper.git"
   },
-  "homepage": "https://github.com/nadavbar/node-spotify-webhelper",
-  "author": "nadavbar <nadavbar@gmail.com>",
+  "homepage": "https://github.com/loretoparisi/node-spotify-webhelper",
+  "author": "loretoparisi <loretoparisi@gmail.com",
   "license": "MIT"
 }

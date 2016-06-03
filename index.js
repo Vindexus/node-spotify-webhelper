@@ -3,6 +3,13 @@
 // modified by Loreto Parisi (loretoparisi at gmail dot com) 2016-06-01
 // @see https://github.com/loretoparisi/node-spotify-webhelper
 
+/**
+* Spotify WebHelper + Port Scanner
+* @see https://github.com/loretoparisi/node-spotify-webhelper
+* @author Loreto Parisi (loretoparisi at gmail dot com)
+*/
+(function() {
+
 var request = require('request')
 var qs = require('querystring')
 var util = require('util');
@@ -93,7 +100,7 @@ function getJson(url, params, headers, cb) {
 
         return cb(null, parsedBody);
     });
-}
+}//getJson
 
 var ASCII_LOWER_CASE = "abcdefghijklmnopqrstuvwxyz";
 // http://stackoverflow.com/questions/1349404/generate-a-string-of-5-random-characters-in-javascript
@@ -104,12 +111,12 @@ function generateRandomString(length) {
         text += ASCII_LOWER_CASE.charAt(Math.floor(Math.random() * ASCII_LOWER_CASE.length));
 
     return text;
-}
+}//generateRandomString
 
 function generateRandomLocalHostName() {
     // Generate a random hostname under the .spotilocal.com domain
     return generateRandomString(10) + '.spotilocal.com'
-}
+}//generateRandomLocalHostName
 
 function getOauthToken(cb) {
     return getJson('http://open.spotify.com/token', function (err, res) {
@@ -119,7 +126,7 @@ function getOauthToken(cb) {
 
         return cb(null, res['t']);
     });
-}
+}//getOauthToken
 
 function isSpotifyWebHelperRunning(cb) {
   cb = cb || function () { };
@@ -144,7 +151,7 @@ function isSpotifyWebHelperRunning(cb) {
     };
     cb(null, false);
   });
-}
+}//isSpotifyWebHelperRunning
 
 function getWindowsSpotifyWebHelperPath() {
   if (!process.env.USERPROFILE) {
@@ -152,7 +159,7 @@ function getWindowsSpotifyWebHelperPath() {
   }
 
   return path.join(process.env.USERPROFILE, 'AppData\\Roaming\\Spotify\\Data\\SpotifyWebHelper.exe');
-}
+}//getWindowsSpotifyWebHelperPath
 
 function launchSpotifyWebhelperIfNeeded(cb) {
   cb = cb || function () { };
@@ -182,41 +189,42 @@ function launchSpotifyWebhelperIfNeeded(cb) {
     return cb(null, true);
   });
 
-}
+}//launchSpotifyWebhelperIfNeeded
 
+
+/**
+ * Spotify Web Helper Main module class
+ * @param opts Object module options
+ */
 function SpotifyWebHelper(opts) {
-    if (!(this instanceof SpotifyWebHelper)) {
-        return new SpotifyWebHelper(opts);
-    }
 
     opts = opts || {};
-    this.localPort = opts.port || DEFAULT_PORT;
+    var localPort = opts.port || DEFAULT_PORT;
 
-    function generateSpotifyUrl(url) {
-        return util.format("https://%s:%d%s", generateRandomLocalHostName(), this.localPort, url)
-    }
+    console.log("init with ", opts);
 
+    function generateSpotifyUrl(url,port) {
+      port = port || localPort;
+      var url=util.format("https://%s:%d%s", generateRandomLocalHostName(), port, url)
+      console.log("generateSpotifyUrl",url)
+      return url;
+    }//generateSpotifyUrl
     function getVersion(cb,port) {
-        port=port||this.localPort;
-        this.localPort=port;
-        var url = generateSpotifyUrl('/service/version.json');
-        return getJson(url, { 'service': 'remote' }, ORIGIN_HEADER, cb)
-    }
-
+      var url = generateSpotifyUrl('/service/version.json',port);
+      return getJson(url, { 'service': 'remote' }, ORIGIN_HEADER, cb)
+    }//getVersion
     function getCsrfToken(cb) {
-        // Requires Origin header to be set to generate the CSRF token.
-        var url = generateSpotifyUrl('/simplecsrf/token.json');
-        return getJson(url, null, ORIGIN_HEADER, function (err, res) {
-            if (err) {
-                return cb(err);
-            }
+      // Requires Origin header to be set to generate the CSRF token.
+      var url = generateSpotifyUrl('/simplecsrf/token.json');
+      return getJson(url, null, ORIGIN_HEADER, function (err, res) {
+          if (err) {
+              return cb(err);
+          }
 
-            return cb(null, res['token']);
-        });
-    }
-
+          return cb(null, res['token']);
+      });
+    }//getCsrfToken
     this.isInitialized = false;
-
     this.init = function (cb) {
         var self = this;
         cb = cb || function () { };
@@ -251,8 +259,7 @@ function SpotifyWebHelper(opts) {
               });
           });
         });
-    }
-
+    }//init
     function spotifyJsonRequest(self, spotifyRelativeUrl, additionalParams, cb) {
       cb = cb || function () { };
       additionalParams = additionalParams || {};
@@ -274,8 +281,11 @@ function SpotifyWebHelper(opts) {
         var url = generateSpotifyUrl(spotifyRelativeUrl);
         getJson(url, params, ORIGIN_HEADER, cb);
       });
-    }
+    }//spotifyJsonRequest
 
+    /**
+     * Get Player Status
+     */
     this.getStatus = function (returnAfter, returnOn, cb) {
 
         if (returnAfter instanceof Function) {
@@ -302,6 +312,9 @@ function SpotifyWebHelper(opts) {
         spotifyJsonRequest(this, '/remote/status.json', params, cb);
     }
 
+    /**
+     * Pause the player
+     */
     this.pause = function (cb) {
       cb = cb || function() {};
 
@@ -312,6 +325,9 @@ function SpotifyWebHelper(opts) {
       spotifyJsonRequest(this, '/remote/pause.json', params, cb);
     }
 
+    /**
+     * Revert pause state to previous state: play | stopped
+     */
     this.unpause = function (cb) {
       cb = cb || function () { };
 
@@ -322,6 +338,9 @@ function SpotifyWebHelper(opts) {
       spotifyJsonRequest(this, '/remote/pause.json', params, cb);
     }
 
+    /**
+     * Play a track by Spotify Track uri
+     */
     this.play = function (spotifyUri, cb) {
       cb = cb || function () { };
 
@@ -333,6 +352,9 @@ function SpotifyWebHelper(opts) {
       spotifyJsonRequest(this, '/remote/play.json', params, cb);
     }
 
+    /**
+     * Get Spotify local protocol's host name
+     */
     this.getLocalHostname = function() {
       return generateRandomLocalHostName();
     }
@@ -354,7 +376,6 @@ function SpotifyWebHelper(opts) {
     this.scanPorts = function(options, cb) {
       var self=this;
 
-      var open = options.open || true;
       var lowPort = options.lowPort || 3000;
       var highPort = options.highPort || 5000;
       var timeout = options.timeout || 300;
@@ -388,8 +409,8 @@ function SpotifyWebHelper(opts) {
             }
           , function(ports) { // all done
             // filtering out ports with errors not supporting spotify local protocol
-            var openPorts = open?ports:ports.filter(function(p,index) {
-                return !p.error
+            var openPorts = ports.filter(function(p,index) {
+                return (typeof(p.error)=='undefined')
             });
             return cb(null,openPorts);
           }
@@ -402,6 +423,8 @@ function SpotifyWebHelper(opts) {
         }
       })
     }//scanPorts
-}
+}//SpotifyWebHelper
 
-module.exports.SpotifyWebHelper = SpotifyWebHelper;
+module.exports = SpotifyWebHelper;
+
+}).call(this);

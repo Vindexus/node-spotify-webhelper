@@ -6,16 +6,15 @@
 (function() {
 
   var SpotifyWebHelper = require('../index');
-  var spotifyClient = new SpotifyWebHelper.SpotifyWebHelper(); // init with default port
+  var spotifyClient = new SpotifyWebHelper(); // init with default port
   spotifyClient.scanPorts({
     lowPort : 3000,
     highPort : 5000,
-    timeout : 300,
-    open : true
+    timeout : 300
   }
   , function(error, ports) {
       if(!error)
-        return console.log( ports );
+        return console.log( JSON.stringify(ports,null,2) );
       else return console.error(error);
   });
 
