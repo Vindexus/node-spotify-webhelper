@@ -39,7 +39,9 @@ spotify.getStatus(function (err, res) {
 Examples - Port detection
 The following example will detect open ports for Spotify desktop applications.
 To detect open ports a forked and modified port scanner node module has been used: https://github.com/baalexander/node-portscanner
-Each of those ports respond to the Spotify local protocol and can be used to communicate to Spotify.
+
+Each of those ports respond to the Spotify local protocol and can be used to communicate to Spotify desktop application on the same host.
+
 
 ```javascript
 var SpotifyWebHelper = require('node-spotify-webhelper-portscanner');
@@ -47,8 +49,7 @@ var spotifyClient = new SpotifyWebHelper(); // init with default port
 spotifyClient.scanPorts({
   lowPort : 3000,
   highPort : 5000,
-  timeout : 300,
-  localopen : true
+  timeout : 300
 }
 , function(error, ports) {
     if(!error)
@@ -72,14 +73,12 @@ An example of the ouput. A json containing a `port` number and an `error` field 
   }
 ]
 ```
-```
 
 Examples - Connect to a specific port
-As soon as a port is known to work, the Spotify Web Helper can be instanciated with that port to correctly communicate to Spotify running application on the same machine:
+As soon as a port is known to work, the Spotify Web Helper can be instantiated with that port to correctly communicate to Spotify running application on the same host:
 
 ```javascript
 var SpotifyWebHelper = require('node-spotify-webhelper-portscanner');
-var openPort = item.port;
 console.log("Connecting to Spotify on port [%d]...", openPort);
 var spotifyClient = new SpotifyWebHelper( { port : openPort });
 spotifyClient.getStatus(function (err, res) {
@@ -94,3 +93,5 @@ return console.log("Spotify is listening on port [%d]", item);
 
 });
 ```
+
+See `examples/` folder for more examples and code.
