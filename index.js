@@ -303,7 +303,7 @@ function SpotifyWebHelper(opts) {
             timeout : 300
           }, function(error,ports) {
             if( !error && ports && ports.length>0) {
-              var localPort=ports[0].port;
+              localPort=ports[0].port;
               console.log("spotify listening on port %d", localPort);
               launchSpotifyWebhelperIfNeeded(function (err, res) {
                 if (err) {
